@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user identification and preferences.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Firebase Auth ID" },
+        "name": { "type": "string", "description": "User's full name" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "language": { "type": "string", "enum": ["en", "ta"], "description": "Preferred language (English or Tamil)" },
+        "role": { "type": "string", "enum": ["farmer", "admin"], "description": "User's role in the app" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["uid", "name", "email", "language", "role"]
+    },
+    "FarmProfile": {
+      "title": "Farm Profile",
+      "description": "Stores farm-specific details for personalized advice.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner's UID" },
+        "district": { "type": "string", "description": "District in Tamil Nadu" },
+        "farmSize": { "type": "string", "description": "Size of the farm in acres" },
+        "soilType": { "type": "string", "description": "Type of soil (e.g., Red, Black, Clay)" },
+        "currentCrops": { "type": "array", "items": { "type": "string" }, "description": "List of currently planted crops" }
+      },
+      "required": ["uid", "district"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/farms/{uid}": {
+      "schema": "FarmProfile",
+      "description": "Farm profile documents, one per user."
+    }
+  }
+}

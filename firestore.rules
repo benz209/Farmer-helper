@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required, immutable) - Firebase Auth ID
+    //   - name: string (required, minLen: 1, maxLen: 100) - User's full name
+    //   - email: string (required, format: email) - User's email address
+    //   - language: string (required, enum: ['en', 'ta']) - Preferred language
+    //   - role: string (required, enum: ['farmer', 'admin']) - User's role
+    //   - createdAt: timestamp (optional, immutable) - Account creation timestamp
+    //
+    // Collection: farms
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required, immutable) - Owner's UID
+    //   - district: string (required, minLen: 1, maxLen: 50) - District in TN
+    //   - farmSize: string (optional, maxLen: 50) - Size in acres
+    //   - soilType: string (optional, maxLen: 50) - Type of soil
+    //   - currentCrops: list (optional, maxItems: 10) - List of crops
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "dbenitto29@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(['uid', 'name', 'email', 'language', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.language in ['en', 'ta'] &&
+             data.role in ['farmer', 'admin'];
+    }
+
+    function isValidFarm(data) {
+      return data.keys().hasOnly(['uid', 'district', 'farmSize', 'soilType', 'currentCrops']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.district is string && data.district.size() > 0 && data.district.size() <= 50 &&
+             (!('farmSize' in data) || (data.farmSize is string && data.farmSize.size() <= 50)) &&
+             (!('soilType' in data) || (data.soilType is string && data.soilType.size() <= 50)) &&
+             (!('currentCrops' in data) || (data.currentCrops is list && data.currentCrops.size() <= 10));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'farmer' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /farms/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidFarm(request.resource.data);
+      allow update: if isOwner(userId) && isValidFarm(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

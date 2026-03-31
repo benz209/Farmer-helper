@@ -1,0 +1,9 @@
+{
+  "name": "Uzhavan Helper",
+  "description": "A comprehensive assistant for Tamil Nadu farmers providing weather updates, crop recommendations, and pesticide suggestions.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera",
+    "microphone"
+  ]
+}
