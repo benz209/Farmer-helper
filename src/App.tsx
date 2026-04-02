@@ -163,7 +163,13 @@ function UzhavanApp() {
   const t = translations[lang];
 
   const callGemini = useCallback(async (params: any, retries = 3): Promise<any> => {
-    const aiInstance = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+    // Check both Vite-prefixed and standard env variables
+    const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || (process.env.GEMINI_API_KEY as string) || "";
+    
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is missing. If you are on Vercel, please rename your variable to VITE_GEMINI_API_KEY and redeploy.");
+    }
+    const aiInstance = new GoogleGenAI({ apiKey });
     try {
       return await aiInstance.models.generateContent(params);
     } catch (err: any) {
@@ -243,11 +249,12 @@ function UzhavanApp() {
     return () => unsubscribe();
   }, [user, isAuthReady]);
 
-  const fetchFarmingData = async (location: string, currentSoilType?: string) => {
+  const fetchFarmingData = async (location: string, currentSoilType?: string, overrideLang?: Language) => {
     setIsLoading(true);
     setError(null);
     setGroundingSources([]);
-    const languageName = lang === 'ta' ? 'Tamil' : 'English';
+    const activeLang = overrideLang || lang;
+    const languageName = activeLang === 'ta' ? 'Tamil' : 'English';
     const soilToUse = currentSoilType || farm?.soilType;
     try {
       // 1. Get Weather using Google Search Grounding
@@ -269,9 +276,15 @@ function UzhavanApp() {
         }
       });
 
-      const weatherText = weatherResponse.text || "{}";
+      const weatherText = weatherResponse.text || "";
+      if (!weatherText) {
+        throw new Error("No response from AI service for weather.");
+      }
       const jsonMatch = weatherText.match(/\{[\s\S]*\}/);
-      const weatherData = JSON.parse(jsonMatch ? jsonMatch[0] : weatherText);
+      if (!jsonMatch) {
+        throw new Error("Invalid response format from AI service for weather.");
+      }
+      const weatherData = JSON.parse(jsonMatch[0]);
       setWeather(weatherData);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
@@ -300,14 +313,26 @@ function UzhavanApp() {
         Return ONLY a JSON object with keys: climate, crops, pesticides${soilToUse ? ', soilAdvice' : ''}.`,
       });
 
-      const adviceText = adviceResponse.text || "{}";
+      const adviceText = adviceResponse.text || "";
+      if (!adviceText) {
+        throw new Error("No response from AI service for farming advice.");
+      }
       const adviceJsonMatch = adviceText.match(/\{[\s\S]*\}/);
-      const adviceData = JSON.parse(adviceJsonMatch ? adviceJsonMatch[0] : adviceText);
+      if (!adviceJsonMatch) {
+        throw new Error("Invalid response format from AI service for farming advice.");
+      }
+      const adviceData = JSON.parse(adviceJsonMatch[0]);
       setAdvice(adviceData);
 
-    } catch (err) {
-      console.error(err);
-      setError("Failed to fetch data. Please try again.");
+    } catch (err: any) {
+      console.error("Farming Data Fetch Error:", err);
+      if (err.message?.includes("GEMINI_API_KEY")) {
+        setError("API Key missing. Please configure GEMINI_API_KEY in settings.");
+      } else if (err.message?.includes("Invalid response format") || err.message?.includes("No response")) {
+        setError("The AI service returned an unexpected response. Retrying might help.");
+      } else {
+        setError("Failed to fetch data. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -421,73 +446,7 @@ function UzhavanApp() {
     
     // Re-fetch data if location is selected
     if (selectedLocation) {
-      // We need to pass the new language explicitly because setLang is async
-      const languageName = newLang === 'ta' ? 'Tamil' : 'English';
-      setIsLoading(true);
-      setError(null);
-      setGroundingSources([]);
-      try {
-        // 1. Get Weather using Google Search Grounding
-        const weatherResponse = await callGemini({
-          model: "gemini-3-flash-preview",
-          contents: `Search for the current weather, 5-day forecast, and hourly temperature for the next 12 hours in ${selectedLocation}, Tamil Nadu right now. 
-          Extract the following details from the search results in ${languageName}:
-          - Current Temperature in Celsius (number only)
-          - Current Condition (e.g. Sunny, Rainy)
-          - Current Humidity percentage (number only)
-          - Current Wind speed (e.g. 10 km/h)
-          - A 1-sentence summary for a farmer.
-          - A 5-day forecast including: Day name, Temperature (High/Low), and Condition.
-          - Hourly temperature for the next 12 hours (Time and Temperature in Celsius).
-          
-          Return ONLY a JSON object with keys: temp, condition, humidity, wind, summary, forecast (array of {day, temp, condition}), hourly (array of {time, temp}).`,
-          config: {
-            tools: [{ googleSearch: {} }],
-          }
-        });
-
-        const weatherText = weatherResponse.text || "{}";
-        const jsonMatch = weatherText.match(/\{[\s\S]*\}/);
-        const weatherData = JSON.parse(jsonMatch ? jsonMatch[0] : weatherText);
-        setWeather(weatherData);
-        setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-
-        // Extract grounding sources
-        const chunks = weatherResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks) {
-          const sources = chunks
-            .filter(chunk => chunk.web)
-            .map(chunk => ({
-              uri: chunk.web!.uri,
-              title: chunk.web!.title || chunk.web!.uri
-            }));
-          setGroundingSources(sources);
-        }
-
-        // 2. Get Climate, Crops, and Pesticides
-        const adviceResponse = await callGemini({
-          model: "gemini-3-flash-preview",
-          contents: `For the location ${selectedLocation}, Tamil Nadu, provide the following in ${languageName}:
-          1. Describe the typical climate and current seasonal conditions for farming.
-          2. Recommend 3-4 crops to plant right now based on the current season and climate.
-          3. Suggest specific organic and chemical pesticides/fertilizers for these crops.
-          ${farm?.soilType ? `4. Since the farm has ${farm.soilType} soil, provide specific soil health management and fertilization advice for this soil type.` : ''}
-          Keep it practical for a farmer. Use Markdown formatting.
-          
-          Return ONLY a JSON object with keys: climate, crops, pesticides${farm?.soilType ? ', soilAdvice' : ''}.`,
-        });
-
-        const adviceText = adviceResponse.text || "{}";
-        const adviceJsonMatch = adviceText.match(/\{[\s\S]*\}/);
-        const adviceData = JSON.parse(adviceJsonMatch ? adviceJsonMatch[0] : adviceText);
-        setAdvice(adviceData);
-
-      } catch (err) {
-        console.error(err);
-        setError("Failed to fetch data. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
+      fetchFarmingData(selectedLocation, undefined, newLang);
     }
 
     if (user) {
