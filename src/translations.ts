@@ -50,6 +50,7 @@ export const translations = {
     diagnosisError: "Could not analyze image. Please try again.",
     apiError: "The AI service is currently busy or experiencing network issues. Retrying...",
     apiFailed: "AI service failed after multiple attempts. Please try again later.",
+    soilHealthAdvice: "Soil Health & Fertilization",
   },
   ta: {
     appName: "உழவன் உதவியாளர்",
@@ -100,5 +101,6 @@ export const translations = {
     diagnosisError: "படத்தை ஆய்வு செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     apiError: "AI சேவை தற்போது பிஸியாக உள்ளது அல்லது நெட்வொர்க் சிக்கல்களை எதிர்கொள்கிறது. மீண்டும் முயற்சிக்கிறது...",
     apiFailed: "பல முயற்சிகளுக்குப் பிறகு AI சேவை தோல்வியடைந்தது. சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.",
+    soilHealthAdvice: "மண் ஆரோக்கியம் மற்றும் உரமிடுதல்",
   }
 };

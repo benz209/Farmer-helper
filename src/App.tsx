@@ -78,6 +78,7 @@ interface FarmingAdvice {
   climate: string;
   crops: string;
   pesticides: string;
+  soilAdvice?: string;
 }
 
 interface DiagnosisResult {
@@ -242,11 +243,12 @@ function UzhavanApp() {
     return () => unsubscribe();
   }, [user, isAuthReady]);
 
-  const fetchFarmingData = async (location: string) => {
+  const fetchFarmingData = async (location: string, currentSoilType?: string) => {
     setIsLoading(true);
     setError(null);
     setGroundingSources([]);
     const languageName = lang === 'ta' ? 'Tamil' : 'English';
+    const soilToUse = currentSoilType || farm?.soilType;
     try {
       // 1. Get Weather using Google Search Grounding
       const weatherResponse = await callGemini({
@@ -292,9 +294,10 @@ function UzhavanApp() {
         1. Describe the typical climate and current seasonal conditions for farming.
         2. Recommend 3-4 crops to plant right now based on the current season and climate.
         3. Suggest specific organic and chemical pesticides/fertilizers for these crops.
+        ${soilToUse ? `4. Since the farm has ${soilToUse} soil, provide specific soil health management and fertilization advice for this soil type.` : ''}
         Keep it practical for a farmer. Use Markdown formatting.
         
-        Return ONLY a JSON object with keys: climate, crops, pesticides.`,
+        Return ONLY a JSON object with keys: climate, crops, pesticides${soilToUse ? ', soilAdvice' : ''}.`,
       });
 
       const adviceText = adviceResponse.text || "{}";
@@ -468,9 +471,10 @@ function UzhavanApp() {
           1. Describe the typical climate and current seasonal conditions for farming.
           2. Recommend 3-4 crops to plant right now based on the current season and climate.
           3. Suggest specific organic and chemical pesticides/fertilizers for these crops.
+          ${farm?.soilType ? `4. Since the farm has ${farm.soilType} soil, provide specific soil health management and fertilization advice for this soil type.` : ''}
           Keep it practical for a farmer. Use Markdown formatting.
           
-          Return ONLY a JSON object with keys: climate, crops, pesticides.`,
+          Return ONLY a JSON object with keys: climate, crops, pesticides${farm?.soilType ? ', soilAdvice' : ''}.`,
         });
 
         const adviceText = adviceResponse.text || "{}";
@@ -512,6 +516,8 @@ function UzhavanApp() {
       await setDoc(doc(db, 'farms', user.uid), farmData);
       setIsEditingFarm(false);
       toast.success(t.profileSaved);
+      // Re-fetch data to include new soil advice or location
+      fetchFarmingData(farmData.district, farmData.soilType);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `farms/${user.uid}`);
     } finally {
@@ -1042,6 +1048,18 @@ function UzhavanApp() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Soil Health Section */}
+                  {advice?.soilAdvice && (
+                    <div className="bg-white border border-[#E5E2D9] rounded-3xl p-8 shadow-sm border-l-4 border-l-[#4CAF50]">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-[#A8A294] mb-8 flex items-center gap-2">
+                        <Droplets className="w-4 h-4 text-[#4CAF50]" /> {t.soilHealthAdvice}
+                      </h3>
+                      <div className="prose prose-slate max-w-none prose-p:text-[#4A463C] prose-headings:text-[#1B3A1E] prose-li:text-[#4A463C]">
+                        <ReactMarkdown>{ensureString(advice?.soilAdvice)}</ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
