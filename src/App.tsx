@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import ReactMarkdown from 'react-markdown';
+import { motion } from 'motion/react';
 import { 
   Cloud, 
   Droplets, 
@@ -156,6 +157,7 @@ function UzhavanApp() {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isRainy, setIsRainy] = useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -243,6 +245,7 @@ function UzhavanApp() {
         setFarm(data);
         if (!selectedLocation) {
           setSelectedLocation(data.district);
+          setIsRainy(false);
           fetchFarmingData(data.district);
         }
       }
@@ -292,6 +295,22 @@ function UzhavanApp() {
       setWeather(weatherData);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
+      // Rainfall Alert Logic
+      const rainDetected = 
+        weatherData.condition?.toLowerCase().includes('rain') || 
+        weatherData.condition?.toLowerCase().includes('shower') ||
+        weatherData.summary?.toLowerCase().includes('rain') ||
+        weatherData.summary?.toLowerCase().includes('மழை'); // Check for Tamil word for rain
+
+      setIsRainy(rainDetected);
+      if (rainDetected) {
+        toast.warning(t.rainAlert, {
+          description: t.rainDetected,
+          duration: 10000,
+          icon: <CloudRain className="w-5 h-5 text-blue-500" />
+        });
+      }
+
       // Extract grounding sources
       const chunks = weatherResponse.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks) {
@@ -330,12 +349,14 @@ function UzhavanApp() {
 
     } catch (err: any) {
       console.error("Farming Data Fetch Error:", err);
-      if (err.message?.includes("GEMINI_API_KEY")) {
-        setError("API Key missing. Please configure GEMINI_API_KEY in settings.");
-      } else if (err.message?.includes("Invalid response format") || err.message?.includes("No response")) {
-        setError("The AI service returned an unexpected response. Retrying might help.");
+      const msg = err.message || String(err);
+      if (msg.includes("GEMINI_API_KEY")) {
+        setError("API Key missing. Please configure VITE_GEMINI_API_KEY in your Vercel environment variables and redeploy.");
+      } else if (msg.includes("Invalid response format") || msg.includes("No response")) {
+        setError("The AI service returned an unexpected response. Please try again.");
       } else {
-        setError("Failed to fetch data. Please try again.");
+        // Show the actual error message to help debugging
+        setError(`Error: ${msg}`);
       }
     } finally {
       setIsLoading(false);
@@ -441,6 +462,7 @@ function UzhavanApp() {
 
   const handleLocationSelect = (location: string) => {
     setSelectedLocation(location);
+    setIsRainy(false);
     fetchFarmingData(location);
   };
 
@@ -450,6 +472,7 @@ function UzhavanApp() {
     
     // Re-fetch data if location is selected
     if (selectedLocation) {
+      setIsRainy(false);
       fetchFarmingData(selectedLocation, undefined, newLang);
     }
 
@@ -611,7 +634,7 @@ function UzhavanApp() {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <button 
-                onClick={() => { setSelectedLocation(""); setWeather(null); setAdvice(null); }}
+                onClick={() => { setSelectedLocation(""); setWeather(null); setAdvice(null); setIsRainy(false); }}
                 className="text-sm font-medium text-[#6B6658] hover:text-[#4CAF50] flex items-center gap-1 transition-colors"
               >
                 <ChevronRight className="w-4 h-4 rotate-180" />
@@ -622,6 +645,23 @@ function UzhavanApp() {
                 {lang === 'ta' ? TAMIL_NADU_DISTRICTS.find(d => d.en === selectedLocation)?.ta : selectedLocation}, TN
               </div>
             </div>
+
+            {/* Rain Alert Banner */}
+            {isRainy && !isLoading && !error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-2xl flex items-center gap-4 shadow-sm"
+              >
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <CloudRain className="w-6 h-6 text-blue-600 animate-bounce" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-blue-900">{t.rainAlert}</h3>
+                  <p className="text-blue-700 text-sm">{t.rainDetected}</p>
+                </div>
+              </motion.div>
+            )}
 
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-32 space-y-4">

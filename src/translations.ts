@@ -51,6 +51,8 @@ export const translations = {
     apiError: "The AI service is currently busy or experiencing network issues. Retrying...",
     apiFailed: "AI service failed after multiple attempts. Please try again later.",
     soilHealthAdvice: "Soil Health & Fertilization",
+    rainAlert: "Rainfall Alert",
+    rainDetected: "Rain detected in your area! Take necessary precautions for your crops.",
   },
   ta: {
     appName: "உழவன் உதவியாளர்",
@@ -102,5 +104,7 @@ export const translations = {
     apiError: "AI சேவை தற்போது பிஸியாக உள்ளது அல்லது நெட்வொர்க் சிக்கல்களை எதிர்கொள்கிறது. மீண்டும் முயற்சிக்கிறது...",
     apiFailed: "பல முயற்சிகளுக்குப் பிறகு AI சேவை தோல்வியடைந்தது. சிறிது நேரம் கழித்து மீண்டும் முயற்சிக்கவும்.",
     soilHealthAdvice: "மண் ஆரோக்கியம் மற்றும் உரமிடுதல்",
+    rainAlert: "மழை எச்சரிக்கை",
+    rainDetected: "உங்கள் பகுதியில் மழை பெய்ய வாய்ப்புள்ளது! உங்கள் பயிர்களுக்குத் தேவையான முன்னெச்சரிக்கை நடவடிக்கைகளை எடுக்கவும்.",
   }
 };
