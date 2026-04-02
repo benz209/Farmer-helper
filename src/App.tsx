@@ -167,7 +167,11 @@ function UzhavanApp() {
     const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || (process.env.GEMINI_API_KEY as string) || "";
     
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is missing. If you are on Vercel, please rename your variable to VITE_GEMINI_API_KEY and redeploy.");
+      console.error("GEMINI_API_KEY is missing. Current env:", { 
+        VITE_GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY, 
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY 
+      });
+      throw new Error("GEMINI_API_KEY is missing. Please add VITE_GEMINI_API_KEY to your Vercel environment variables and REDEPLOY your app.");
     }
     const aiInstance = new GoogleGenAI({ apiKey });
     try {
